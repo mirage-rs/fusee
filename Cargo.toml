@@ -2,8 +2,23 @@
 name = "fusee"
 version = "0.1.0"
 authors = ["Justus K <justus.k@protonmail.com>"]
+keywords = []
+categories = []
 edition = "2018"
 license = "Apache-2.0/MIT"
+description = "Launcher for the Fusee Gelee exploit."
+documentation = "https://docs.rs/fusee"
+repository = "https://github.com/mirage-rs/fusee"
+homepage = "https://github.com/mirage-rs/fusee"
+readme = "README.md"
+
+[lib]
+name = "fusee"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fusee"
+path = "src/main.rs"
 
 [dependencies]
 clap = "2.33.0"
