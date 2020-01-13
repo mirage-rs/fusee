@@ -1,0 +1,9 @@
+[package]
+name = "fusee"
+version = "0.1.0"
+authors = ["Justus K <justus.k@protonmail.com>"]
+edition = "2018"
+license = "Apache-2.0/MIT"
+
+[dependencies]
+clap = "2.33.0"
