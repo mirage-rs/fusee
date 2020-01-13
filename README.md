@@ -1,2 +1,2 @@
-# cargo-template-cli
-Cargo template for generating CLIs
+# Fusee
+Fusee is a launcher for the Fusee Gelee exploit.
