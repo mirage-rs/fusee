@@ -49,16 +49,63 @@ fn insert_length(payload: &mut BytesMut) {
 }
 
 fn insert_code(payload: &mut BytesMut, code: Bytes) {
-    let mut first_part = code;
-    let second_part = first_part.split_off((STACK_SPRAY_START - PAYLOAD_START_ADDR) as usize);
-    payload.put(first_part);
-    insert_stack_spray(payload);
-    payload.put(second_part);
+    let len = (STACK_SPRAY_START - PAYLOAD_START_ADDR) as usize;
+    if payload.len() < len {
+        payload.put(code);
+    } else {
+        let mut first_part = code;
+        let second_part = first_part.split_off(len);
+        payload.put(first_part);
+        insert_stack_spray(payload);
+        payload.put(second_part);
+    }
 }
 
 fn insert_stack_spray(payload: &mut BytesMut) {
     let count = ((STACK_SPRAY_END - STACK_SPRAY_START) / 4) as u32;
     for _ in 0..count {
         payload.put_u32_le(RCM_PAYLOAD_ADDR);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_insert_length() {
+        let mut payload = BytesMut::new();
+        insert_length(&mut payload);
+        assert_eq!(&payload[..], &[0x98, 0x02, 0x03, 0x00]);
+    }
+
+    #[test]
+    fn test_insert_padding() {
+        let mut payload = BytesMut::new();
+        insert_padding(&mut payload, 10);
+        assert_eq!(&payload[..], &[0x0; 10]);
+    }
+
+    #[test]
+    fn test_insert_stack_spray() {
+        let mut payload = BytesMut::new();
+        let count = ((STACK_SPRAY_END - STACK_SPRAY_START) / 4) as usize;
+        insert_stack_spray(&mut payload);
+        assert_eq!(
+            &payload[..],
+            RCM_PAYLOAD_ADDR.to_le_bytes().repeat(count).as_slice()
+        );
+    }
+
+    #[test]
+    fn test_insert_code() {
+        let mut payload = BytesMut::new();
+        insert_code(&mut payload, Bytes::default());
+        assert_eq!(&payload[..], &[0x0; 0]);
+
+        let mut code = BytesMut::new();
+        code.put_u32_le(0x40010000);
+        insert_code(&mut payload, code.freeze());
+        assert_eq!(&payload[..], &[0x0, 0x0, 0x1, 0x40]);
     }
 }
