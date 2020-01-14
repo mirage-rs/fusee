@@ -16,10 +16,5 @@ readme = "README.md"
 name = "fusee"
 path = "src/lib.rs"
 
-[[bin]]
-name = "fusee"
-path = "src/main.rs"
-
 [dependencies]
-clap = "2.33.0"
 bytes = "0.5.3"
