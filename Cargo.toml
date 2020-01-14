@@ -12,6 +12,9 @@ repository = "https://github.com/mirage-rs/fusee"
 homepage = "https://github.com/mirage-rs/fusee"
 readme = "README.md"
 
+[workspace]
+members = ["fusee-cli"]
+
 [lib]
 name = "fusee"
 path = "src/lib.rs"
