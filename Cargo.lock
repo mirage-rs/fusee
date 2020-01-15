@@ -53,7 +53,9 @@ dependencies = [
 name = "fusee-cli"
 version = "0.1.0"
 dependencies = [
+ "bytes 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fusee 0.1.0",
 ]
 
 [[package]]

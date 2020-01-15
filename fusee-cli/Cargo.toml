@@ -13,3 +13,4 @@ path = "src/main.rs"
 [dependencies]
 clap = "2.33.0"
 fusee = { path = "../" }
+bytes = "0.5.3"
