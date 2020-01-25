@@ -21,3 +21,4 @@ path = "src/lib.rs"
 
 [dependencies]
 bytes = "0.5.3"
+thiserror = "1.0.9"

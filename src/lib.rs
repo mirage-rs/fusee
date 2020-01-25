@@ -9,6 +9,9 @@
 //! 4. The payload is padded to be evenly divisible by the 0x1000 block size.
 
 use bytes::{BufMut, Bytes, BytesMut};
+use std::convert::TryInto;
+use std::io::{self, Write};
+use thiserror::Error;
 
 const LENGTH: u32 = 0x30298;
 
@@ -24,6 +27,14 @@ const PAYLOAD_START_ADDR: u32 = 0x40010E40;
 const STACK_SPRAY_START: u32 = 0x40014E40;
 const STACK_SPRAY_END: u32 = 0x40017000;
 
+#[derive(Error, Debug)]
+pub enum WriteError {
+    #[error("Payload exceeds length 0x30298")]
+    PayloadTooBig,
+    #[error("Failed to write to writer")]
+    WriteFailed(#[from] io::Error),
+}
+
 /// Builds the payload that executes the given code using the Fusee
 /// Gelee exploit.
 pub fn build_payload(code: Bytes) -> Bytes {
@@ -37,6 +48,37 @@ pub fn build_payload(code: Bytes) -> Bytes {
     insert_padding(&mut payload, 0x1000 - (len % 0x1000));
 
     payload.freeze()
+}
+
+pub fn write_payload<W: Write + Sized>(payload: Bytes, writer: &mut W) -> Result<(), WriteError> {
+    if payload.len() > LENGTH.try_into().unwrap() {
+        return Err(WriteError::PayloadTooBig);
+    }
+
+    let mut current_buffer = 0;
+    let mut len = payload.len();
+    let mut data = payload;
+
+    while len > 0 {
+        let data_to_transmit = std::cmp::min(0x1000, len);
+        len = len - data_to_transmit;
+
+        let chunk = data.slice(0..data_to_transmit);
+        data = data.slice(data_to_transmit..);
+
+        current_buffer = 1 - current_buffer;
+
+        writer.write_all(&chunk).map_err(|e| WriteError::from(e))?;
+    }
+
+    // Switch to the high dma buffer
+    if current_buffer == 0 {
+        writer
+            .write_all(b"\0".repeat(0x1000).as_slice())
+            .map_err(|e| WriteError::from(e))?;
+    }
+
+    Ok(())
 }
 
 fn insert_padding(payload: &mut BytesMut, len: usize) {
