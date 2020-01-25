@@ -1,3 +1,5 @@
+mod usb;
+
 use bytes::Bytes;
 use clap::{crate_authors, crate_description, crate_version, App, Arg};
 use std::{
