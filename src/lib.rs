@@ -13,6 +13,8 @@ use std::convert::TryInto;
 use std::io::{self, Write};
 use thiserror::Error;
 
+pub mod usb;
+
 const LENGTH: u32 = 0x30298;
 
 // The address where the RCM payload is placed.

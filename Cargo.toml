@@ -22,4 +22,5 @@ path = "src/cli/main.rs"
 
 [dependencies]
 bytes = "0.5.4"
+rusb = "0.5"
 thiserror = "1.0.17"
