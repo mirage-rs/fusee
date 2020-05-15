@@ -128,6 +128,20 @@ impl Rcm {
 }
 
 /// Attempts to find a Nintendo Switch device in RCM mode and opens a handle to it.
-pub fn get_rcm_device(vid: Option<u16>, pid: Option<u16>) -> Option<DeviceHandle<GlobalContext>> {
-    open_device_with_vid_pid(vid.unwrap_or(RCM_VID), pid.unwrap_or(RCM_PID))
+pub fn get_rcm_device(vid: Option<u16>, pid: Option<u16>) -> Result<DeviceHandle<GlobalContext>> {
+    let actual_vid = vid.unwrap_or(RCM_VID);
+    let actual_pid = pid.unwrap_or(RCM_PID);
+
+    let device_list = DeviceList::new()?;
+
+    for device in device_list.iter() {
+        let descriptor = device.device_descriptor()?;
+
+        if descriptor.product_id() == actual_pid && descriptor.vendor_id() == actual_vid {
+            let device_handle = device.open()?;
+            return Ok(device_handle);
+        }
+    }
+
+    Err(Error::NoDevice)
 }
