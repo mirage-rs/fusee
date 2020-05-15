@@ -1,12 +1,11 @@
-use log::*;
-use pretty_env_logger::formatted_builder;
+mod status;
+
+use termcolor::Color;
 
 fn main() {
-    let mut logger = formatted_builder();
-    logger.filter(None, LevelFilter::Debug);
-    logger.init();
-
-    info!("such information");
-    warn!("o_O");
-    error!("much error");
+    info!("Searching", "for connected switch").unwrap();
+    ok!("Found", "compatible device on port 1337").unwrap();
+    info!("Preparing", "payload").unwrap();
+    info!("Sending", "payload to the device").unwrap();
+    error!("Failed", "to send to payload: cool error here").unwrap();
 }
