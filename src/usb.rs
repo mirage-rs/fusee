@@ -89,11 +89,13 @@ impl Rcm {
     ///
     /// NOTE: For the CVE-2018-6242 exploit, usage of the high
     /// buffer effectively reduces the amount of writes necessary.
-    pub fn switch_dma_buffer(&mut self, high: bool) {
+    pub fn switch_dma_buffer(&mut self, high: bool) -> Result<()> {
         if self.is_dma_buffer_high != high {
-            self.write(&[0x00; 0x1000]).unwrap();
+            self.write(&[0x00; 0x1000])?;
             self.swap_dma_buffers();
         }
+
+        Ok(())
     }
 
     /// Reads the Device ID from RCM over USB.
