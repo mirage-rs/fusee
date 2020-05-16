@@ -24,3 +24,6 @@ path = "src/cli/main.rs"
 bytes = "0.5.4"
 rusb = "0.5"
 thiserror = "1.0.17"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = "0.17"
