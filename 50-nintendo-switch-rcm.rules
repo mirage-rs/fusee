@@ -1,0 +1,5 @@
+# udev rule for granting full access permissions to a Nintendo Switch device
+# in RCM mode that is connected over USB. This is necessary to avoid permission
+# errors in the payload launcher if the USB device is not accessible by default.
+
+SUBSYSTEM=="usb", ATTR{idProduct}=="7321", ATTR{idVendor}=="0955", MODE="0777"
