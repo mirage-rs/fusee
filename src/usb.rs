@@ -157,6 +157,15 @@ impl Rcm {
 
     /// Exploits the RCM vulnerability by triggering a largely oversized memcpy.
     ///
+    /// The returned result is the number of bytes read in case of `Ok(n)`,
+    /// otherwise the error caused by USB.
+    #[cfg(target_os = "windows")]
+    pub fn memecpy(&self) -> Result<usize> {
+        unimplemented!("TODO")
+    }
+
+    /// Exploits the RCM vulnerability by triggering a largely oversized memcpy.
+    ///
     /// NOTE: Since libusb on Linux does not allow us to blow up pages, we need
     /// to use the raw usbfs file descriptor to trigger the vulnerability.
     ///
