@@ -1,29 +1,24 @@
+mod app;
 mod error;
+mod operations;
 mod status;
 
+use app::*;
 use error::FuseeError;
-use fusee::usb::{get_rcm_device, Rcm};
-use fusee::rusb;
+use operations::*;
+use structopt::StructOpt;
 
 fn main() {
-    match execute() {
-        Ok(()) => {}
+    match try_main() {
+        Ok(_) => {}
         Err(err) => error!("Failed", "{}", err),
     }
 }
 
-fn execute() -> Result<(), FuseeError> {
-    info!("Searching", "for a Switch in RCM mode...");
-    let dev = match get_rcm_device(None, None) {
-        Ok(dev) => Rcm::new(dev),
-        Err(rusb::Error::Access) => return Err(FuseeError::PermissionDenied),
-        Err(rusb::Error::NoDevice) => return Err(FuseeError::NoDevice),
-        Err(rusb::Error::Busy) | Err(rusb::Error::Timeout) => return Err(FuseeError::AlreadyInjected),
-        Err(e) => return Err(e.into()),
-    };
-    let dev_id = dev.read_device_id().ok_or(FuseeError::InvalidDeviceId)?;
+fn try_main() -> Result<(), FuseeError> {
+    let app = App::from_args();
 
-    info!("Found", "compatible Switch with id {:?}", dev_id);
-
-    Ok(())
+    match app.op {
+        Operation::Inject(options) => inject::do_inject(options),
+    }
 }

@@ -3,7 +3,7 @@
 use std::{cmp::min, time::Duration};
 
 #[cfg(target_os = "linux")]
-use nix::{fcntl, unistd::close, sys::stat::Mode};
+use nix::{fcntl, sys::stat::Mode, unistd::close};
 
 use rusb::*;
 
@@ -15,9 +15,9 @@ const RCM_PID: u16 = 0x7321;
 const RCM_VID: u16 = 0x0955;
 
 /// Start address of the low DMA buffer in RCM mode.
-const DMA_LOW_BUFFER_ADDRESS: u32 = 0x40005000;
+const DMA_LOW_BUFFER_ADDRESS: u32 = 0x4000_5000;
 /// Start address of the high DMA buffer in RCM mode.
-const DMA_HIGH_BUFFER_ADDRESS: u32 = 0x40009000;
+const DMA_HIGH_BUFFER_ADDRESS: u32 = 0x4000_9000;
 
 #[cfg(target_os = "linux")]
 mod ioctl {
@@ -39,10 +39,15 @@ mod ioctl {
         pub usercontext: *const c_void,
     }
 
-    const URB_IOC_MAGIC: u8 = 'U' as u8;
+    const URB_IOC_MAGIC: u8 = b'U';
     const URB_IOC_NR_SUBMIT: u8 = 10;
 
-    ioctl_read!(usbdevfs_submit_urb, URB_IOC_MAGIC, URB_IOC_NR_SUBMIT, UsbDeviceUrb);
+    ioctl_read!(
+        usbdevfs_submit_urb,
+        URB_IOC_MAGIC,
+        URB_IOC_NR_SUBMIT,
+        UsbDeviceUrb
+    );
 }
 
 /// An abstraction of the Tegra X1 RCM mode.
@@ -83,7 +88,8 @@ impl Rcm {
     /// case of `Ok(n)`, otherwise the error caused by USB.
     pub fn read(&self, buffer: &mut [u8]) -> Result<usize> {
         // Perform the read over USB.
-        self.device.read_bulk(0x81, buffer, Duration::from_millis(1000))
+        self.device
+            .read_bulk(0x81, buffer, Duration::from_millis(1000))
     }
 
     pub fn write(&mut self, mut buffer: &[u8]) -> Result<usize> {
@@ -102,7 +108,10 @@ impl Rcm {
 
             // Swap the DMA buffers and perform the write over USB.
             self.swap_dma_buffers();
-            match self.device.write_bulk(0x01, chunk, Duration::from_millis(1000)) {
+            match self
+                .device
+                .write_bulk(0x01, chunk, Duration::from_millis(5000))
+            {
                 Ok(n) => written_bytes += n,
                 Err(err) => return Err(err),
             };
@@ -137,7 +146,11 @@ impl Rcm {
         let mut device_id = [0; 0x10];
 
         match self.read(&mut device_id) {
-            Ok(bytes) => if bytes != 0x10 { return None; },
+            Ok(bytes) => {
+                if bytes != 0x10 {
+                    return None;
+                }
+            }
             Err(_) => return None,
         };
 
@@ -157,7 +170,8 @@ impl Rcm {
         // Issue a Get Status control request with an Endpoint recipient which causes the
         // which causes the size of the data to copy into the DMA buffer to be set to the
         // size of the bytes requested by us.
-        self.device.read_control(0x82, 0x00, 0, 0, &mut buffer, Duration::from_millis(1000))
+        self.device
+            .read_control(0x82, 0x00, 0, 0, &mut buffer, Duration::from_millis(1000))
     }
 
     /// Exploits the RCM vulnerability by triggering a largely oversized memcpy.
@@ -166,7 +180,7 @@ impl Rcm {
     /// otherwise the error caused by USB.
     #[cfg(target_os = "windows")]
     pub fn memecpy(&self) -> Result<usize> {
-        unimplemented!("TODO")
+        todo!()
     }
 
     /// Exploits the RCM vulnerability by triggering a largely oversized memcpy.
@@ -183,7 +197,11 @@ impl Rcm {
 
         // Prepare the path to the USB device to access.
         let device = self.device.device();
-        let usbfs = format!("/dev/bus/usb/{:0>3}/{:0>3}", device.bus_number(), device.address());
+        let usbfs = format!(
+            "/dev/bus/usb/{:0>3}/{:0>3}",
+            device.bus_number(),
+            device.address()
+        );
 
         // Open the usbfs file descriptor.
         let fd = fcntl::open(usbfs.as_str(), fcntl::OFlag::O_RDWR, Mode::all()).unwrap();

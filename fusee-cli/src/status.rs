@@ -5,7 +5,7 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 #[macro_export]
 macro_rules! ok {
     ($title:expr, $msg:expr) => {
-        status::print($title, $msg, termcolor::Color::Green).unwrap()
+        $crate::status::print($title, $msg, termcolor::Color::Green).unwrap()
     };
     ($title:expr, $msg:expr, $($arg:tt)*) => {
         ok!($title, format!($msg, $($arg)*).as_str())
@@ -15,7 +15,7 @@ macro_rules! ok {
 #[macro_export]
 macro_rules! info {
     ($title:expr, $msg:expr) => {
-        status::print($title, $msg, termcolor::Color::Cyan).unwrap()
+        $crate::status::print($title, $msg, termcolor::Color::Cyan).unwrap()
     };
     ($title:expr, $msg:expr, $($arg:tt)*) => {
         info!($title, format!($msg, $($arg)*).as_str())
@@ -25,7 +25,7 @@ macro_rules! info {
 #[macro_export]
 macro_rules! error {
     ($title:expr, $msg:expr) => {
-        status::print($title, $msg, termcolor::Color::Red).unwrap()
+        $crate::status::print($title, $msg, termcolor::Color::Red).unwrap()
     };
     ($title:expr, $msg:expr, $($arg:tt)*) => {
         error!($title, format!($msg, $($arg)*).as_str())

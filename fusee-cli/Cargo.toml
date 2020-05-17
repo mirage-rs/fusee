@@ -8,6 +8,7 @@ edition = "2018"
 confy = "0.4.0"
 thiserror = "1.0.18"
 termcolor = "1.1.0"
+structopt = "0.3.14"
 
 [dependencies.fusee]
 path = "../"
