@@ -12,6 +12,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use std::convert::TryInto;
 use std::io::{self, Write};
 use thiserror::Error;
+pub use rusb;
 
 pub mod usb;
 

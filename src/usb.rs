@@ -62,6 +62,11 @@ impl Rcm {
         }
     }
 
+    /// Returns the underlying device information used for this DeviceHandle.
+    pub fn get_device(&self) -> Device<GlobalContext> {
+        self.device.device()
+    }
+
     /// Gets the address of the currently active DMA buffer.
     #[inline(always)]
     fn get_dma_address(&self) -> u32 {

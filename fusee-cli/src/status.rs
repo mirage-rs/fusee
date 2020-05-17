@@ -5,21 +5,30 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 #[macro_export]
 macro_rules! ok {
     ($title:expr, $msg:expr) => {
-        status::print($title, $msg, Color::Green)
+        status::print($title, $msg, termcolor::Color::Green).unwrap()
+    };
+    ($title:expr, $msg:expr, $($arg:tt)*) => {
+        ok!($title, format!($msg, $($arg)*).as_str())
     };
 }
 
 #[macro_export]
 macro_rules! info {
     ($title:expr, $msg:expr) => {
-        status::print($title, $msg, Color::Cyan)
+        status::print($title, $msg, termcolor::Color::Cyan).unwrap()
+    };
+    ($title:expr, $msg:expr, $($arg:tt)*) => {
+        info!($title, format!($msg, $($arg)*).as_str())
     };
 }
 
 #[macro_export]
 macro_rules! error {
     ($title:expr, $msg:expr) => {
-        status::print($title, $msg, Color::Red)
+        status::print($title, $msg, termcolor::Color::Red).unwrap()
+    };
+    ($title:expr, $msg:expr, $($arg:tt)*) => {
+        error!($title, format!($msg, $($arg)*).as_str())
     };
 }
 
@@ -36,7 +45,6 @@ pub(crate) fn print(
     write!(stdout, "{:>12}", title)?;
 
     stdout.reset()?;
-    // stdout.set_color(ColorSpec::new().set_bold(true));
     writeln!(stdout, " {}", msg)?;
     stdout.flush()?;
 

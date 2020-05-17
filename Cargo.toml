@@ -16,14 +16,12 @@ readme = "README.md"
 name = "fusee"
 path = "src/lib.rs"
 
-[[bin]]
-name = "fusee"
-path = "src/cli/main.rs"
+[workspace]
+members = ["fusee-cli"]
 
 [dependencies]
 bytes = "0.5.4"
 rusb = "0.5"
-termcolor = "1.1.0"
 thiserror = "1.0.17"
 
 [target.'cfg(target_os = "linux")'.dependencies]
