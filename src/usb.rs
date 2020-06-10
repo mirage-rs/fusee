@@ -7,6 +7,13 @@ use nix::{fcntl, sys::stat::Mode, unistd::close};
 
 use rusb::*;
 
+#[allow(dead_code)]
+#[cfg(target_os = "linux")]
+mod types {
+    // Include the usbdevice_fs.h FFI bindings.
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
+
 use super::PAYLOAD_START_ADDR;
 
 /// Default Nintendo Switch Product ID for RCM mode.
@@ -19,35 +26,111 @@ const DMA_LOW_BUFFER_ADDRESS: u32 = 0x4000_5000;
 /// Start address of the high DMA buffer in RCM mode.
 const DMA_HIGH_BUFFER_ADDRESS: u32 = 0x4000_9000;
 
+#[allow(unused)]
 #[cfg(target_os = "linux")]
-mod ioctl {
-    use nix::libc::c_void;
+mod usbdevfs {
+    use std::ffi;
+    use std::mem::forget;
+    use std::os::unix::io::RawFd;
 
-    #[repr(C)]
-    pub struct UsbDeviceUrb {
-        pub r#type: u8,
-        pub endpoint: u8,
-        pub status: i32,
-        pub flags: u32,
-        pub buffer: *mut c_void,
-        pub buffer_length: i32,
-        pub actual_length: i32,
-        pub start_frame: i32,
-        pub stream_id: u32,
-        pub error_count: i32,
-        pub signr: u32,
-        pub usercontext: *const c_void,
+    use bytes::BufMut;
+
+    use super::types::*;
+
+    ioctl_read!(usbdevfs_submiturb, 'U', 10, usbdevfs_urb);
+
+    pub enum TransferDirection {
+        HostToDevice,
+        DeviceToHost,
     }
 
-    const URB_IOC_MAGIC: u8 = b'U';
-    const URB_IOC_NR_SUBMIT: u8 = 10;
+    pub enum RequestType {
+        Standard,
+        Class,
+        Vendor,
+        Reserved,
+    }
 
-    ioctl_read!(
-        usbdevfs_submit_urb,
-        URB_IOC_MAGIC,
-        URB_IOC_NR_SUBMIT,
-        UsbDeviceUrb
-    );
+    pub enum Recipient {
+        Device,
+        Interface,
+        Endpoint,
+        Other,
+        Reserved(u8),
+    }
+
+    pub struct ControlRequest {
+        pub direction: TransferDirection,
+        pub request_type: RequestType,
+        pub recipient: Recipient,
+        pub request: u8,
+        pub value: u16,
+        pub index: u16,
+        pub data: Vec<u8>,
+    }
+
+    impl ControlRequest {
+        pub fn write_request(&self, data: &mut Vec<u8>) {
+            let direction = match self.direction {
+                TransferDirection::HostToDevice => 0b00000000,
+                TransferDirection::DeviceToHost => 0b10000000,
+            };
+            let request_type = match self.request_type {
+                RequestType::Standard => 0b00000000,
+                RequestType::Class => 0b00100000,
+                RequestType::Vendor => 0b01000000,
+                RequestType::Reserved => 0b01100000,
+            };
+            let recipient = match self.recipient {
+                Recipient::Device => 0b00000000,
+                Recipient::Interface => 0b00000001,
+                Recipient::Endpoint => 0b00000010,
+                Recipient::Other => 0b00000011,
+                Recipient::Reserved(v) => v,
+            };
+
+            data.put_u8(direction + request_type + recipient);
+            data.put_u8(self.request);
+            data.put_u16_le(self.value);
+            data.put_u16_le(self.index);
+            data.put_u16_le(self.data.len() as u16);
+        }
+    }
+
+    fn create_urb(id: usize, mut data: Vec<u8>) -> Box<usbdevfs_urb> {
+        let urb = usbdevfs_urb {
+            type_: USBDEVFS_URB_TYPE_CONTROL,
+            endpoint: 0,
+            status: 0,
+            flags: 0,
+            buffer: data.as_mut_ptr() as *mut ffi::c_void,
+            buffer_length: data.len() as i32,
+            actual_length: 0,
+            start_frame: 0,
+            __bindgen_anon_1: usbdevfs_urb__bindgen_ty_1 {
+                number_of_packets: 0,
+            },
+            error_count: 0,
+            signr: 0,
+            usercontext: id as *mut ffi::c_void,
+            iso_frame_desc: __IncompleteArrayField::new(),
+        };
+
+        forget(data);
+
+        Box::new(urb)
+    }
+
+    pub unsafe fn submit_urb(fd: RawFd, request: &ControlRequest) {
+        // Prepare the request buffer.
+        let mut data = Vec::with_capacity(request.data.len() + 8);
+        request.write_request(&mut data);
+
+        // Create the URB.
+        let urb = create_urb(0x1337, data);
+
+        usbdevfs_submiturb(fd, Box::into_raw(urb)).unwrap();
+    }
 }
 
 /// An abstraction of the Tegra X1 RCM mode.
@@ -206,29 +289,19 @@ impl Rcm {
         // Open the usbfs file descriptor.
         let fd = fcntl::open(usbfs.as_str(), fcntl::OFlag::O_RDWR, Mode::all()).unwrap();
 
-        // Craft the Get Status packet to send over USB.
-        let mut control_message = [0; 8];
-        control_message[0] = 0x82; // Request to Endpoint recipient.
-        control_message[1] = 0x00; // Get Status request.
-        control_message[6..].copy_from_slice(&length.to_le_bytes()); // Request length.
-
-        let mut request = ioctl::UsbDeviceUrb {
-            r#type: 2,
-            endpoint: 0,
-            status: 0,
-            flags: 0,
-            buffer: control_message.as_mut_ptr() as *mut _,
-            buffer_length: control_message.len() as i32,
-            actual_length: 0,
-            start_frame: 0,
-            stream_id: 0,
-            error_count: 0,
-            signr: 0,
-            usercontext: 0x1337 as *const _,
+        // Craft the Get Status request to send over USB.
+        let request = usbdevfs::ControlRequest {
+            direction: usbdevfs::TransferDirection::HostToDevice,
+            request_type: usbdevfs::RequestType::Standard,
+            recipient: usbdevfs::Recipient::Endpoint,
+            request: 0x0, // Get Status
+            value: 0,
+            index: 0,
+            data: vec![0; length as usize],
         };
 
-        // Submit the URB to the kernel with black ioctl magic.
-        unsafe { ioctl::usbdevfs_submit_urb(fd, &mut request).unwrap() };
+        // Do the ioctl magic.
+        unsafe { usbdevfs::submit_urb(fd, &request) };
 
         // Close the usbfs file descriptor.
         close(fd).unwrap();

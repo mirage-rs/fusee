@@ -8,6 +8,10 @@
 //! 3. The program which should be executed.
 //! 4. The payload is padded to be evenly divisible by the 0x1000 block size.
 
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+
 pub use bytes;
 use bytes::{BufMut, Bytes, BytesMut};
 pub use rusb;
