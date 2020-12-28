@@ -11,6 +11,7 @@
 #![deny(rust_2018_idioms, broken_intra_doc_links)]
 
 pub use bytes;
+pub mod usb;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use std::cmp;
@@ -31,11 +32,10 @@ const PAYLOAD_START_ADDR: u32 = 0x4001_0E40;
 const STACK_SPRAY_START: u32 = 0x4001_4E40;
 const STACK_SPRAY_END: u32 = 0x4001_7000;
 
-/// The number of bytes before the stack spray.
-const BEFORE_SPRAY_LENGTH: u32 = STACK_SPRAY_START - PAYLOAD_START_ADDR;
-
 /// Constructs a new payload that then can be send to the device using USB.
-pub fn build_payload(code: impl AsRef<[u8]>) -> Bytes {
+///
+/// Returns `None` if `code` was too big and didn't fit into the payload.
+pub fn build_payload(code: impl AsRef<[u8]>) -> Option<Bytes> {
     let mut payload = BytesMut::new();
 
     // first `u32` is the length of the usb packet
@@ -73,7 +73,12 @@ pub fn build_payload(code: impl AsRef<[u8]>) -> Bytes {
     let pad = 0x1000 - (len % 0x1000);
     insert_padding(&mut payload, pad);
 
-    payload.freeze()
+    // check if payload is small enough to be send via USB
+    if payload.len() > LENGTH as usize {
+        None
+    } else {
+        Some(payload.freeze())
+    }
 }
 
 fn insert_padding(payload: &mut BytesMut, len: usize) {

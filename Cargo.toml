@@ -14,3 +14,7 @@ readme = "README.md"
 
 [dependencies]
 bytes = "1.0.0"
+argh = "0.1.4"
+owo-colors = "1.2.1"
+rusb = "0.6.5"
+thiserror = "1.0.23"
