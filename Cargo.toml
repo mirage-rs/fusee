@@ -12,20 +12,4 @@ repository = "https://github.com/mirage-rs/fusee"
 homepage = "https://github.com/mirage-rs/fusee"
 readme = "README.md"
 
-[lib]
-name = "fusee"
-path = "src/lib.rs"
-
-[workspace]
-members = ["fusee-cli"]
-
 [dependencies]
-bytes = "0.5.4"
-rusb = "0.5"
-thiserror = "1.0.17"
-
-[target.'cfg(target_os = "linux")'.dependencies]
-nix = "0.17"
-
-[build-dependencies]
-bindgen = "0.54"
